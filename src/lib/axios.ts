@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "https://continuum-backend.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE_URL; // Change this to your actual API base URL
 
 const api = axios.create({
   baseURL: API_BASE,
