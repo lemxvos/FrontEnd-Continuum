@@ -1,0 +1,161 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "@/lib/axios";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
+import MentionTag, { extractMentions } from "@/components/MentionTag";
+import UpgradeModal from "@/components/UpgradeModal";
+
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-1">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/@([\w\u00C0-\u024F]+)/g, '<span class="mention-person">@$1</span>')
+    .replace(/#([\w\u00C0-\u024F]+)/g, '<span class="mention-project">#$1</span>')
+    .replace(/(?<!\*)\*(?!\*)(?!\s)([\w\u00C0-\u024F]+)/g, '<span class="mention-habit">*$1</span>')
+    .replace(/\n/g, "<br/>");
+}
+
+export default function JournalEditorPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isNew = !id || id === "new";
+
+  const [content, setContent] = useState(() =>
+    isNew ? localStorage.getItem("continuum_draft") || "" : ""
+  );
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!isNew && id) {
+      api.get(`/api/journal/${id}`)
+        .then(({ data }) => setContent(data.content))
+        .catch((err) => {
+          toast.error(err.response?.data?.message || "Erro");
+          navigate("/journal");
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [id]);
+
+  // Auto-save every 30s
+  useEffect(() => {
+    if (isNew) {
+      localStorage.setItem("continuum_draft", content);
+    }
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    if (!isNew && content.trim()) {
+      autoSaveRef.current = setTimeout(() => handleSave(true), 30000);
+    }
+    return () => {
+      if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    };
+  }, [content]);
+
+  const handleSave = async (silent = false) => {
+    if (!content.trim()) return;
+    setSaving(true);
+    try {
+      if (isNew) {
+        const { data: entry } = await api.post("/api/journal", { content });
+        localStorage.removeItem("continuum_draft");
+        if (!silent) toast.success("Entrada criada!");
+        navigate(`/journal/${entry.id}`, { replace: true });
+      } else {
+        await api.put(`/api/journal/${id}`, { content });
+        if (!silent) toast.success("Entrada salva!");
+      }
+    } catch (err: any) {
+      if (err.response?.status === 403 || err.response?.status === 400) {
+        setUpgradeOpen(true);
+      } else {
+        toast.error(err.response?.data?.message || "Erro ao salvar");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const charCount = content.length;
+  const mentions = extractMentions(content);
+
+  if (loading) {
+    return (
+      <div className="space-y-4 max-w-3xl mx-auto">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/journal")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-bold">{isNew ? "Nova Entrada" : "Editar Entrada"}</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPreview(!preview)}
+            className={preview ? "text-primary" : ""}
+          >
+            {preview ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+          <Button onClick={() => handleSave(false)} disabled={saving || !content.trim()} className="gap-1">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar
+          </Button>
+        </div>
+      </div>
+
+      {preview ? (
+        <div className="surface rounded-xl p-6 min-h-[400px]">
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(content || "Nada para preview...") }}
+          />
+        </div>
+      ) : (
+        <Textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Escreva sobre seu dia... Use @pessoa, #projeto, *hábito para destacar menções."
+          className="min-h-[400px] font-mono text-sm resize-none"
+        />
+      )}
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+        <div className="flex items-center gap-3">
+          <span>{wordCount} palavras</span>
+          <span>{charCount} caracteres</span>
+        </div>
+        {mentions.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {mentions.map((m, i) => (
+              <MentionTag key={`${m.type}-${m.name}-${i}`} type={m.type} name={m.name} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+    </div>
+  );
+}
