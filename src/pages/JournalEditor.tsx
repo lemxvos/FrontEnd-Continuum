@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
-import MentionTag, { extractValidMentions } from "@/components/MentionTag";
+import MentionTag, { extractMentions, normalizeShortcuts, denormalizeToShortcuts } from "@/components/MentionTag";
 import MentionInput from "@/components/MentionInput";
 import UpgradeModal from "@/components/UpgradeModal";
 
@@ -46,7 +46,11 @@ export default function JournalEditorPage() {
   useEffect(() => {
     if (!isNew && id) {
       api.get(`/api/notes/${id}`)
-        .then(({ data }) => setContent(data.content))
+        .then(({ data }) => {
+          // Convert mentions from {TYPE:name} to @name for editing
+          const contentForEdit = denormalizeToShortcuts(data.content);
+          setContent(contentForEdit);
+        })
         .catch((err) => {
           toast.error(err.response?.data?.message || "Erro");
           navigate("/journal");
@@ -90,13 +94,15 @@ export default function JournalEditorPage() {
     if (!content.trim()) return;
     setSaving(true);
     try {
+      // Normalize mentions from @name to {PERSON:name} format before saving
+      const normalizedContent = normalizeShortcuts(content, entities);
       if (isNew) {
-        const { data: entry } = await api.post("/api/notes", { content });
+        const { data: entry } = await api.post("/api/notes", { content: normalizedContent });
         localStorage.removeItem("continuum_draft");
         if (!silent) toast.success("Entrada criada!");
         navigate(`/journal/${entry.id}`, { replace: true });
       } else {
-        await api.put(`/api/notes/${id}`, { content });
+        await api.put(`/api/notes/${id}`, { content: normalizedContent });
         if (!silent) toast.success("Entrada salva!");
       }
     } catch (err: any) {
@@ -112,7 +118,7 @@ export default function JournalEditorPage() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
-  const mentions = extractValidMentions(content, entities);
+  const mentions = extractMentions(content);
 
   if (loading) {
     return (
