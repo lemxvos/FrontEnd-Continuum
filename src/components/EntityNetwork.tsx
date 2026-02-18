@@ -128,10 +128,10 @@ export function EntityNetwork() {
           }
         }
 
-        (nodes[i].vx || 0) = ((nodes[i].vx || 0) + fx * 0.005) * 0.99;
-        (nodes[i].vy || 0) = ((nodes[i].vy || 0) + fy * 0.005) * 0.99;
-        (nodes[i].x || 0) += nodes[i].vx || 0;
-        (nodes[i].y || 0) += nodes[i].vy || 0;
+        nodes[i].vx = (((nodes[i].vx ?? 0) + fx * 0.005) * 0.99);
+        nodes[i].vy = (((nodes[i].vy ?? 0) + fy * 0.005) * 0.99);
+        nodes[i].x = (nodes[i].x ?? 0) + (nodes[i].vx ?? 0);
+        nodes[i].y = (nodes[i].y ?? 0) + (nodes[i].vy ?? 0);
       }
 
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
