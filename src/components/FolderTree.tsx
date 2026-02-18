@@ -78,4 +78,119 @@ function buildFolderTree(folders: Array<{ path: string; name: string; count: num
   return rootFolders;
 }
 
-function FolderTreeNode({\n  node,\n  depth,\n  onSelect,\n  selected,\n}: {\n  node: FolderNode;\n  depth: number;\n  onSelect: (path: string) => void;\n  selected?: string | null;\n}) {\n  const [expanded, setExpanded] = useState(false);\n  const hasSubfolders = node.subfolders && node.subfolders.length > 0;\n\n  return (\n    <>\n      <button\n        onClick={() => {\n          if (hasSubfolders) setExpanded(!expanded);\n          onSelect(node.path);\n        }}\n        className={cn(\n          \"flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm transition-colors hover:bg-accent\",\n          selected === node.path ? \"bg-primary/10 text-primary font-medium\" : \"text-foreground\"\n        )}\n        style={{ marginLeft: `${depth * 12}px` }}\n      >\n        {hasSubfolders && (\n          <button\n            onClick={(e) => {\n              e.stopPropagation();\n              setExpanded(!expanded);\n            }}\n            className=\"p-0.5 hover:bg-accent rounded\"\n          >\n            {expanded ? (\n              <ChevronDown className=\"h-3 w-3\" />\n            ) : (\n              <ChevronRight className=\"h-3 w-3\" />\n            )}\n          </button>\n        )}\n        {!hasSubfolders && <div className=\"w-4\" />}\n        <Folder className=\"h-4 w-4 text-muted-foreground\" />\n        <span className=\"truncate flex-1 text-left\">{node.name}</span>\n        {node.count > 0 && (\n          <span className=\"text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded\">\n            {node.count}\n          </span>\n        )}\n      </button>\n\n      {expanded && hasSubfolders && (\n        <div className=\"space-y-0.5\">\n          {node.subfolders!.map((subfolder) => (\n            <FolderTreeNode\n              key={subfolder.path}\n              node={subfolder}\n              depth={depth + 1}\n              onSelect={onSelect}\n              selected={selected}\n            />\n          ))}\n        </div>\n      )}\n    </>\n  );\n}\n\nexport function FolderTree({ onFolderSelect, selectedFolder }: FolderTreeProps) {\n  const [folders, setFolders] = useState<FolderNode[]>([]);\n  const [loading, setLoading] = useState(false);\n\n  useEffect(() => {\n    loadFolders();\n  }, []);\n\n  const loadFolders = async () => {\n    setLoading(true);\n    try {\n      const { data } = await api.get(\"/api/notes/folders\");\n      const folderList = Array.isArray(data) ? data : [];\n      setFolders(buildFolderTree(folderList));\n    } catch (err) {\n      console.error(\"Erro ao carregar pastas\", err);\n    } finally {\n      setLoading(false);\n    }\n  };\n\n  if (loading) return <p className=\"text-xs text-muted-foreground px-2\">Carregando...</p>;\n\n  return (\n    <div className=\"space-y-1\">\n      <button\n        onClick={() => onFolderSelect?.(\"all\")}\n        className={cn(\n          \"flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent\",\n          selectedFolder === \"all\" || !selectedFolder ? \"bg-primary/10 text-primary\" : \"text-foreground\"\n        )}\n      >\n        <Folder className=\"h-4 w-4\" />\n        Todas as notas\n      </button>\n      {folders.map((folder) => (\n        <FolderTreeNode\n          key={folder.path}\n          node={folder}\n          depth={0}\n          onSelect={onFolderSelect || (() => {})}\n          selected={selectedFolder}\n        />\n      ))}\n    </div>\n  );\n}\n
+function FolderTreeNode({
+  node,
+  depth,
+  onSelect,
+  selected,
+}: {
+  node: FolderNode;
+  depth: number;
+  onSelect: (path: string) => void;
+  selected?: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasSubfolders = node.subfolders && node.subfolders.length > 0;
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          if (hasSubfolders) setExpanded(!expanded);
+          onSelect(node.path);
+        }}
+        className={cn(
+          'flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm transition-colors hover:bg-accent',
+          selected === node.path ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+        )}
+        style={{ marginLeft: `${depth * 12}px` }}
+      >
+        {hasSubfolders && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="p-0.5 hover:bg-accent rounded"
+          >
+            {expanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </button>
+        )}
+        {!hasSubfolders && <div className="w-4" />}
+        <Folder className="h-4 w-4 text-muted-foreground" />
+        <span className="truncate flex-1 text-left">{node.name}</span>
+        {node.count > 0 && (
+          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+            {node.count}
+          </span>
+        )}
+      </button>
+
+      {expanded && hasSubfolders && (
+        <div className="space-y-0.5">
+          {node.subfolders!.map((subfolder) => (
+            <FolderTreeNode
+              key={subfolder.path}
+              node={subfolder}
+              depth={depth + 1}
+              onSelect={onSelect}
+              selected={selected}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function FolderTree({ onFolderSelect, selectedFolder }: FolderTreeProps) {
+  const [folders, setFolders] = useState<FolderNode[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  const loadFolders = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/api/notes/folders');
+      const folderList = Array.isArray(data) ? data : [];
+      setFolders(buildFolderTree(folderList));
+    } catch (err) {
+      console.error('Erro ao carregar pastas', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <p className="text-xs text-muted-foreground px-2">Carregando...</p>;
+
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={() => onFolderSelect?.('all')}
+        className={cn(
+          'flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent',
+          selectedFolder === 'all' || !selectedFolder ? 'bg-primary/10 text-primary' : 'text-foreground'
+        )}
+      >
+        <Folder className="h-4 w-4" />
+        Todas as notas
+      </button>
+      {folders.map((folder) => (
+        <FolderTreeNode
+          key={folder.path}
+          node={folder}
+          depth={0}
+          onSelect={onFolderSelect || (() => {})}
+          selected={selectedFolder}
+        />
+      ))}
+    </div>
+  );
+}
