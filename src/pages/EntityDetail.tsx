@@ -90,7 +90,7 @@ export default function EntityDetailPage() {
           setMentions(data.mentions);
         }
       }).catch(() => {}),
-    ;
+    );
 
     Promise.allSettled(promises)
       .catch((err) => {
