@@ -9,7 +9,8 @@ import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
 import MentionTag, { extractMentions } from "@/components/MentionTag";
 import UpgradeModal from "@/components/UpgradeModal";
 
-function renderMarkdown(text: string): string {
+function renderMarkdown(text: string | undefined | null): string {
+  if (!text) return "<p class=\"text-muted-foreground\">Nada para preview...</p>";
   return text
     .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold mt-3 mb-1">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-1">$1</h2>')

@@ -62,7 +62,7 @@ export default function JournalPage() {
   const filteredEntries = useMemo(() => {
     if (!searchQuery.trim()) return entries;
     const q = searchQuery.toLowerCase();
-    return entries.filter((e) => e.content.toLowerCase().includes(q));
+    return entries.filter((e) => (e.content || "").toLowerCase().includes(q));
   }, [entries, searchQuery]);
 
   const groups = useMemo(() => groupByDate(filteredEntries), [filteredEntries]);

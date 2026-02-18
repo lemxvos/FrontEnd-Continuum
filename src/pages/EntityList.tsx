@@ -69,7 +69,7 @@ export default function EntityListPage() {
   };
 
   const filtered = search.trim()
-    ? entities.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
+    ? entities.filter((e) => (e.name || "").toLowerCase().includes(search.toLowerCase()))
     : entities;
 
   if (loading) {

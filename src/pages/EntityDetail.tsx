@@ -49,7 +49,8 @@ const iconMap: Record<string, { icon: typeof Users; colorClass: string }> = {
   CUSTOM: { icon: HelpCircle, colorClass: "text-muted-foreground bg-muted" },
 };
 
-function highlightSnippet(text: string) {
+function highlightSnippet(text: string | undefined | null) {
+  if (!text) return "";
   return text
     .replace(/@([\w\u00C0-\u024F]+)/g, '<span class="mention-person">@$1</span>')
     .replace(/#([\w\u00C0-\u024F]+)/g, '<span class="mention-project">#$1</span>')

@@ -18,8 +18,9 @@ interface JournalCardProps {
 }
 
 export default function JournalCard({ entry, onClick, onDelete, index = 0 }: JournalCardProps) {
-  const mentions = extractMentions(entry.content);
-  const preview = entry.content.replace(/[#@*]/g, "").slice(0, 200);
+  const content = entry.content || "";
+  const mentions = extractMentions(content);
+  const preview = content.replace(/[#@*]/g, "").slice(0, 200);
   const date = new Date(entry.createdAt);
 
   return (
