@@ -7,7 +7,7 @@ import { Users, Target, FolderKanban, Star, Heart } from "lucide-react";
 interface Entity {
   id: string;
   name: string;
-  type: "PERSON" | "HABIT" | "PROJECT" | "GOAL" | "DREAM" | "CUSTOM";
+  type: "PERSON" | "HABIT" | "PROJECT" | "GOAL" | "DREAM" | "CUSTOM" | "EVENT";
 }
 
 interface MentionInputProps {
@@ -18,15 +18,27 @@ interface MentionInputProps {
   minHeight?: string;
 }
 
-const typeConfig: Record<string, { prefix: string; icon: typeof Users; color: string }> = {
-  PERSON: { prefix: "@", icon: Users, color: "text-entity-person" },
-  HABIT: { prefix: "*", icon: Target, color: "text-entity-habit" },
-  PROJECT: { prefix: "#", icon: FolderKanban, color: "text-entity-project" },
-  GOAL: { prefix: "◎", icon: Star, color: "text-entity-goal" },
-  DREAM: { prefix: "♡", icon: Heart, color: "text-entity-dream" },
-  CUSTOM: { prefix: "@", icon: Users, color: "text-muted-foreground" },
+const typeConfig: Record<string, { trigger: string; icon: typeof Users; color: string }> = {
+  PERSON: { trigger: "@", icon: Users, color: "text-entity-person" },
+  HABIT: { trigger: "*", icon: Target, color: "text-entity-habit" },
+  PROJECT: { trigger: "#", icon: FolderKanban, color: "text-entity-project" },
+  GOAL: { trigger: "◎", icon: Star, color: "text-entity-goal" },
+  DREAM: { trigger: "♡", icon: Heart, color: "text-entity-dream" },
+  EVENT: { trigger: "◈", icon: Users, color: "text-muted-foreground" },
+  CUSTOM: { trigger: "@", icon: Users, color: "text-muted-foreground" },
 };
 
+/**
+ * MentionInput with autocomplete support for entities.
+ * 
+ * When user types @, #, or * followed by entity name, system suggests matching entities.
+ * On selection, inserts {{entity:entityId}} format.
+ * 
+ * Important: Backend is responsible for:
+ * - Extracting {{entity:id}} mentions
+ * - Calculating entity mentions count in entity_index.json
+ * - Updating metrics
+ */
 export default function MentionInput({
   value,
   onChange,
@@ -48,12 +60,15 @@ export default function MentionInput({
   useEffect(() => {
     const loadEntities = async () => {
       try {
-        const [people, habits, projects] = await Promise.all([
+        const [people, habits, projects, goals, dreams, events] = await Promise.all([
           api.get("/api/entities?type=PERSON").then(({ data }) => data || []),
           api.get("/api/entities?type=HABIT").then(({ data }) => data || []),
           api.get("/api/entities?type=PROJECT").then(({ data }) => data || []),
+          api.get("/api/entities?type=GOAL").then(({ data }) => data || []),
+          api.get("/api/entities?type=DREAM").then(({ data }) => data || []),
+          api.get("/api/entities?type=EVENT").then(({ data }) => data || []),
         ]);
-        setEntities([...people, ...habits, ...projects]);
+        setEntities([...people, ...habits, ...projects, ...goals, ...dreams, ...events]);
       } catch (err) {
         console.error("Erro ao carregar entidades:", err);
       }
@@ -62,90 +77,88 @@ export default function MentionInput({
   }, []);
 
   // Handle text input and trigger detection
-  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    const pos = e.target.selectionStart;
-    
-    onChange(text);
-    setCursorPos(pos);
+  const handleInput = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const text = e.target.value;
+      const pos = e.target.selectionStart;
 
-    // Find if we're after a trigger character
-    let trigger: "@" | "#" | "*" | null = null;
-    let search = "";
+      onChange(text);
+      setCursorPos(pos);
 
-    // Look backward from cursor for trigger chars
-    for (let i = pos - 1; i >= 0; i--) {
-      const char = text[i];
-      
-      // Stop if space at wrong position (e.g., "@ pessoa" after the space)
-      if (char === " " && search.length > 0) break;
-      if (char === " " && search.length === 0) continue; // Allow space immediately after @
-      
-      // Check for trigger characters
-      if (char === "@" || char === "#" || char === "*") {
-        trigger = char;
-        break;
+      // Find if we're after a trigger character (@, #, *)
+      let trigger: "@" | "#" | "*" | null = null;
+      let search = "";
+
+      // Look backward from cursor
+      for (let i = pos - 1; i >= 0; i--) {
+        const char = text[i];
+
+        // Stop on newline or if we've searched far enough
+        if (char === "\n" || (search.length > 30 && trigger)) break;
+
+        // Check for trigger characters
+        if (char === "@" || char === "#" || char === "*") {
+          trigger = char;
+          break;
+        }
+
+        // Accumulate search text (letters, numbers, unicode)
+        if (/[\w\u00C0-\u024F\s-]/.test(char)) {
+          search = char + search;
+        } else if (search.length > 0) {
+          // Stop if we hit non-word char and already have search
+          break;
+        }
       }
-      
-      // Accumulate search text
-      if (/[\w\u00C0-\u024F]/.test(char)) {
-        search = char + search;
+
+      // Only show suggestions if trigger found and search is meaningful
+      if (trigger && search.trim().length > 0) {
+        const typeMap: Record<string, keyof typeof typeConfig> = {
+          "@": "PERSON",
+          "#": "PROJECT",
+          "*": "HABIT",
+        };
+        const typeFilter = typeMap[trigger];
+
+        // Filter entities by type and search text
+        const filtered = entities
+          .filter((e) => e.type === typeFilter)
+          .filter((e) => e.name.toLowerCase().includes(search.toLowerCase().trim()))
+          .slice(0, 8);
+
+        setTriggerChar(trigger);
+        setSearchText(search.trim());
+        setSuggestions(filtered);
+        setShowSuggestions(filtered.length > 0);
+        selectedRef.current = 0;
       } else {
-        break;
+        setShowSuggestions(false);
+        setTriggerChar(null);
+        setSearchText("");
       }
-    }
+    },
+    [onChange, entities]
+  );
 
-    if (trigger) {
-      const typeMap: Record<string, keyof typeof typeConfig> = {
-        "@": "PERSON",
-        "#": "PROJECT",
-        "*": "HABIT",
-      };
-      const typeFilter = typeMap[trigger];
-
-      // Filter entities by type and search text
-      const filtered = entities
-        .filter((e) => e.type === typeFilter)
-        .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
-        .slice(0, 8);
-
-      setTriggerChar(trigger);
-      setSearchText(search);
-      setSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0);
-      selectedRef.current = 0;
-    } else {
-      setShowSuggestions(false);
-      setTriggerChar(null);
-      setSearchText("");
-    }
-  }, [onChange, entities]);
-
-  // Handle selecting a suggestion
+  // Insert mention in {{entity:id}} format
   const insertMention = (entity: Entity) => {
     if (!textareaRef.current || !triggerChar) return;
 
     const text = value;
     const pos = cursorPos;
 
-    // Find the start of the word we're replacing
-    let wordStart = pos - 1;
-    while (wordStart >= 0 && /[\w\u00C0-\u024F]/.test(text[wordStart])) {
-      wordStart--;
-    }
-    while (wordStart >= 0 && text[wordStart] === " ") {
-      wordStart--;
-    }
-    while (wordStart >= 0 && text[wordStart] !== triggerChar) {
-      wordStart--;
+    // Find the start of trigger (look backward for @, #, or *)
+    let triggerStart = pos - 1;
+    while (triggerStart >= 0 && /[\w\u00C0-\u024F\s-]/.test(text[triggerStart])) {
+      triggerStart--;
     }
 
-    // Replace from trigger char to cursor
-    const newText = text.slice(0, wordStart + 1) + entity.name + text.slice(pos);
+    // Replace from trigger to cursor with {{entity:id}}
+    const newText = text.slice(0, triggerStart + 1) + `{{entity:${entity.id}}} ` + text.slice(pos);
     onChange(newText);
 
     // Update cursor position
-    const newPos = wordStart + 1 + entity.name.length;
+    const newPos = triggerStart + 1 + `{{entity:${entity.id}}} `.length;
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -158,7 +171,7 @@ export default function MentionInput({
 
   // Handle keyboard navigation in suggestions
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showSuggestions) return;
+    if (!showSuggestions || suggestions.length === 0) return;
 
     switch (e.key) {
       case "ArrowDown":
@@ -216,7 +229,7 @@ export default function MentionInput({
                 )}
               >
                 <Icon className={cn("h-4 w-4", config.color)} />
-                <span className="font-medium">{config.prefix}{entity.name}</span>
+                <span className="font-medium">{config.trigger}{entity.name}</span>
               </button>
             );
           })}

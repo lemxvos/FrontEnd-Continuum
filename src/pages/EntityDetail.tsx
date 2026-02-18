@@ -52,9 +52,7 @@ const iconMap: Record<string, { icon: typeof Users; colorClass: string }> = {
 function highlightSnippet(text: string | undefined | null) {
   if (!text) return "";
   return text
-    .replace(/@([\w\u00C0-\u024F]+)/g, '<span class="mention-person">@$1</span>')
-    .replace(/#([\w\u00C0-\u024F]+)/g, '<span class="mention-project">#$1</span>')
-    .replace(/\*([\w\u00C0-\u024F]+)/g, '<span class="mention-habit">*$1</span>');
+    .replace(/\{\{entity:([^}]+)\}\}/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">📌 [$1]</span>');
 }
 
 export default function EntityDetailPage() {

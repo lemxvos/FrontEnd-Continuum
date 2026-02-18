@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
-import MentionTag, { extractMentions, normalizeShortcuts, denormalizeToShortcuts } from "@/components/MentionTag";
+import MentionTag, { extractEntityMentions } from "@/components/MentionTag";
 import MentionInput from "@/components/MentionInput";
 import UpgradeModal from "@/components/UpgradeModal";
 
@@ -22,9 +22,7 @@ function renderMarkdown(text: string | undefined | null): string {
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-1">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/@([\w\u00C0-\u024F]+)/g, '<span class="mention-person">@$1</span>')
-    .replace(/#([\w\u00C0-\u024F]+)/g, '<span class="mention-project">#$1</span>')
-    .replace(/(?<!\*)\*(?!\*)(?!\s)([\w\u00C0-\u024F]+)/g, '<span class="mention-habit">*$1</span>')
+    .replace(/\{\{entity:([^}]+)\}\}/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">📌 [$1]</span>')
     .replace(/\n/g, "<br/>");
 }
 
@@ -47,9 +45,8 @@ export default function JournalEditorPage() {
     if (!isNew && id) {
       api.get(`/api/notes/${id}`)
         .then(({ data }) => {
-          // Convert mentions from {TYPE:name} to @name for editing
-          const contentForEdit = denormalizeToShortcuts(data.content);
-          setContent(contentForEdit);
+          // Load content as-is from backend (no transformation)
+          setContent(data.content);
         })
         .catch((err) => {
           toast.error(err.response?.data?.message || "Erro");
@@ -59,7 +56,7 @@ export default function JournalEditorPage() {
     }
   }, [id]);
 
-  // Load entities for mention validation
+  // Load entities for mention suggestions (only for autocomplete UI)
   useEffect(() => {
     const loadEntities = async () => {
       try {
@@ -94,15 +91,15 @@ export default function JournalEditorPage() {
     if (!content.trim()) return;
     setSaving(true);
     try {
-      // Normalize mentions from @name to {PERSON:name} format before saving
-      const normalizedContent = normalizeShortcuts(content, entities);
+      // Send content as-is to backend
+      // Backend is responsible for extracting {{entity:id}} mentions
       if (isNew) {
-        const { data: entry } = await api.post("/api/notes", { content: normalizedContent });
+        const { data: entry } = await api.post("/api/notes", { content });
         localStorage.removeItem("continuum_draft");
         if (!silent) toast.success("Entrada criada!");
         navigate(`/journal/${entry.id}`, { replace: true });
       } else {
-        await api.put(`/api/notes/${id}`, { content: normalizedContent });
+        await api.put(`/api/notes/${id}`, { content });
         if (!silent) toast.success("Entrada salva!");
       }
     } catch (err: any) {
@@ -118,7 +115,7 @@ export default function JournalEditorPage() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
-  const mentions = extractMentions(content);
+  const mentionedEntityIds = extractEntityMentions(content);
 
   if (loading) {
     return (
@@ -176,13 +173,6 @@ export default function JournalEditorPage() {
           <span>{wordCount} palavras</span>
           <span>{charCount} caracteres</span>
         </div>
-        {mentions.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {mentions.map((m, i) => (
-              <MentionTag key={`${m.type}-${m.name}-${i}`} type={m.type} name={m.name} />
-            ))}
-          </div>
-        )}
       </div>
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
