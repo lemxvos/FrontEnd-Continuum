@@ -1,1 +1,78 @@
-/**\n * MENTION DISPLAY\n * \n * Renderiza menções em um texto\n * \n * ENTRADA:\n * - content: \"Saí com {person:ent_8f2a} e {project:ent_91ab}\"\n * - entities: [{ id: \"ent_8f2a\", name: \"Emilly\", icon: \"👩\" }, ...]\n * \n * SAÍDA:\n * \"Saí com [👩 Emilly] e [📊 Projeto X]\"\n * \n * REGRA:\n * - Recebe entidades JÁ PROCESSADAS pelo backend\n * - Apenas renderiza como chips/badges\n * - Totalmente determinístico\n */\n\nimport { useMentionTokens } from \"@/hooks/useMentions\";\nimport { Entity } from \"@/types/models\";\nimport { EntityBadge } from \"./EntityBadge\";\n\ninterface MentionDisplayProps {\n  content: string;\n  entities: Entity[];\n  className?: string;\n  onEntityClick?: (entity: Entity) => void;\n}\n\nexport function MentionDisplay({\n  content,\n  entities,\n  className = \"\",\n  onEntityClick,\n}: MentionDisplayProps) {\n  const tokens = useMentionTokens(content);\n\n  // Map para buscar entidades por seu reference {type:id}\n  const entityMap = new Map(\n    entities.map((e) => [`${e.type}:${e.id}`, e])\n  );\n\n  return (\n    <div className={`prose prose-sm max-w-none break-words ${className}`}>\n      {tokens.map((token, idx) => {\n        if (token.type === \"text\") {\n          return (\n            <span key={idx} className=\"whitespace-pre-wrap\">\n              {token.value}\n            </span>\n          );\n        }\n\n        // É uma menção\n        if (token.entity) {\n          const key = `${token.entity.type}:${token.entity.id}`;\n          const entity = entityMap.get(key);\n\n          // Se não encontrou a entidade, apenas mostra o raw mention\n          if (!entity) {\n            return <span key={idx} className=\"text-gray-400\">{token.value}</span>;\n          }\n\n          // Renderiza como badge\n          return (\n            <EntityBadge\n              key={idx}\n              entity={entity}\n              onClick={() => onEntityClick?.(entity)}\n            />\n          );\n        }\n\n        return null;\n      })}\n    </div>\n  );\n}\n
+/**
+ * MENTION DISPLAY
+ *
+ * Renderiza menções em um texto
+ *
+ * ENTRADA:
+ * - content: "Saí com {person:ent_8f2a} e {project:ent_91ab}"
+ * - entities: [{ id: "ent_8f2a", name: "Emilly", icon: "👩" }, ...]
+ *
+ * SAÍDA:
+ * "Saí com [👩 Emilly] e [📊 Projeto X]"
+ *
+ * REGRA:
+ * - Recebe entidades JÁ PROCESSADAS pelo backend
+ * - Apenas renderiza como chips/badges
+ * - Totalmente determinístico
+ */
+
+import { useMentionTokens } from "@/hooks/useMentions";
+import { Entity } from "@/types/models";
+import { EntityBadge } from "./EntityBadge";
+
+interface MentionDisplayProps {
+  content: string;
+  entities: Entity[];
+  className?: string;
+  onEntityClick?: (entity: Entity) => void;
+}
+
+export function MentionDisplay({
+  content,
+  entities,
+  className = "",
+  onEntityClick,
+}: MentionDisplayProps) {
+  const tokens = useMentionTokens(content);
+
+  // Map para buscar entidades por seu reference {type:id}
+  const entityMap = new Map(
+    entities.map((e) => [`${e.type}:${e.id}`, e])
+  );
+
+  return (
+    <div className={`prose prose-sm max-w-none break-words ${className}`}>
+      {tokens.map((token, idx) => {
+        if (token.type === "text") {
+          return (
+            <span key={idx} className="whitespace-pre-wrap">
+              {token.value}
+            </span>
+          );
+        }
+
+        // É uma menção
+        if (token.entity) {
+          const key = `${token.entity.type}:${token.entity.id}`;
+          const entity = entityMap.get(key);
+
+          // Se não encontrou a entidade, apenas mostra o raw mention
+          if (!entity) {
+            return <span key={idx} className="text-gray-400">{token.value}</span>;
+          }
+
+          // Renderiza como badge
+          return (
+            <EntityBadge
+              key={idx}
+              entity={entity}
+              onClick={() => onEntityClick?.(entity)}
+            />
+          );
+        }
+
+        return null;
+      })}
+    </div>
+  );
+}

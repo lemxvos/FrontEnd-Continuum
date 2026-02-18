@@ -1,1 +1,129 @@
-/**\n * ENTITY SELECTOR\n * \n * Autocomplete para selecionar entidades e inserir como menção\n * \n * FLUXO:\n * 1. Usuário digita no editor: \"Saí com {pe\"\n * 2. Componente detecta o padrão {pe\n * 3. Busca entidades que começam com \"pe\"\n * 4. Mostra dropdown com sugestões\n * 5. Usuário clica ou pressiona Enter\n * 6. Frontend INSERE {type:id} no texto\n * 7. Backend recebe e valida tudo\n */\n\nimport { useEffect, useRef, useState } from \"react\";\nimport {\n  Command,\n  CommandEmpty,\n  CommandGroup,\n  CommandInput,\n  CommandItem,\n  CommandList,\n} from \"@/components/ui/command\";\nimport {\n  Popover,\n  PopoverContent,\n  PopoverTrigger,\n} from \"@/components/ui/popover\";\nimport { Entity, EntityType } from \"@/types/models\";\nimport { useEntityStore } from \"@/stores/entityStore\";\nimport { EntityBadge } from \"./EntityBadge\";\n\ninterface EntitySelectorProps {\n  /**\n   * Quando usuário seleciona uma entidade\n   * Frontend passa:\n   * - entity: a entidade completa\n   * - Frontend será RESPONSÁVEL de inserir no textarea\n   */\n  onSelect: (entity: Entity) => void;\n\n  // Opcional: filtrar por tipo\n  entityType?: EntityType;\n\n  // Opcional: placeholder\n  placeholder?: string;\n\n  // Se deve abrir dropdown automaticamente\n  isOpen?: boolean;\n  onOpenChange?: (open: boolean) => void;\n\n  // Query inicial (do autocomplete)\n  initialQuery?: string;\n}\n\nexport function EntitySelector({\n  onSelect,\n  entityType,\n  placeholder = \"Buscar entidade...\",\n  isOpen = false,\n  onOpenChange,\n  initialQuery = \"\",\n}: EntitySelectorProps) {\n  const [open, setOpen] = useState(isOpen);\n  const [query, setQuery] = useState(initialQuery);\n  const { search, lastSearchResults } = useEntityStore();\n  const commandRef = useRef<HTMLDivElement>(null);\n\n  // Busca automaticamente ao mudar query\n  useEffect(() => {\n    const timer = setTimeout(() => {\n      if (query.trim()) {\n        search(query, entityType);\n      }\n    }, 200); // Debounce\n\n    return () => clearTimeout(timer);\n  }, [query, entityType, search]);\n\n  const handleSelect = (entity: Entity) => {\n    onSelect(entity);\n    setOpen(false);\n    setQuery(\"\");\n  };\n\n  const handleOpenChange = (newOpen: boolean) => {\n    setOpen(newOpen);\n    onOpenChange?.(newOpen);\n  };\n\n  return (\n    <Popover open={open} onOpenChange={handleOpenChange}>\n      <PopoverTrigger asChild>\n        {/* Não renderiza um botão, apenas ativa o popover */}\n        <div />\n      </PopoverTrigger>\n      <PopoverContent className=\"w-[300px] p-0\" align=\"start\">\n        <Command>\n          <CommandInput\n            placeholder={placeholder}\n            value={query}\n            onValueChange={setQuery}\n            autoFocus\n          />\n          <CommandList>\n            {lastSearchResults.length === 0 && query.trim() && (\n              <CommandEmpty>Nenhuma entidade encontrada</CommandEmpty>\n            )}\n\n            {lastSearchResults.length > 0 && (\n              <CommandGroup>\n                {lastSearchResults.map((entity) => (\n                  <CommandItem\n                    key={entity.id}\n                    value={entity.id}\n                    onSelect={() => handleSelect(entity)}\n                  >\n                    <EntityBadge entity={entity} />\n                  </CommandItem>\n                ))}\n              </CommandGroup>\n            )}\n          </CommandList>\n        </Command>\n      </PopoverContent>\n    </Popover>\n  );\n}\n
+/**
+ * ENTITY SELECTOR
+ *
+ * Autocomplete para selecionar entidades e inserir como menção
+ *
+ * FLUXO:
+ * 1. Usuário digita no editor: "Saí com {pe"
+ * 2. Componente detecta o padrão {pe
+ * 3. Busca entidades que começam com "pe"
+ * 4. Mostra dropdown com sugestões
+ * 5. Usuário clica ou pressiona Enter
+ * 6. Frontend INSERE {type:id} no texto
+ * 7. Backend recebe e valida tudo
+ */
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Entity, EntityType } from "@/types/models";
+import { useEntityStore } from "@/stores/entityStore";
+import { EntityBadge } from "./EntityBadge";
+
+interface EntitySelectorProps {
+  /**
+   * Quando usuário seleciona uma entidade
+   * Frontend passa:
+   * - entity: a entidade completa
+   * - Frontend será RESPONSÁVEL de inserir no textarea
+   */
+  onSelect: (entity: Entity) => void;
+
+  // Opcional: filtrar por tipo
+  entityType?: EntityType;
+
+  // Opcional: placeholder
+  placeholder?: string;
+
+  // Se deve abrir dropdown automaticamente
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+
+  // Query inicial (do autocomplete)
+  initialQuery?: string;
+}
+
+export function EntitySelector({
+  onSelect,
+  entityType,
+  placeholder = "Buscar entidade...",
+  isOpen = false,
+  onOpenChange,
+  initialQuery = "",
+}: EntitySelectorProps) {
+  const [open, setOpen] = useState(isOpen);
+  const [query, setQuery] = useState(initialQuery);
+  const { search, lastSearchResults } = useEntityStore();
+  const commandRef = useRef<HTMLDivElement>(null);
+
+  // Busca automaticamente ao mudar query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query.trim()) {
+        search(query, entityType);
+      }
+    }, 200); // Debounce
+
+    return () => clearTimeout(timer);
+  }, [query, entityType, search]);
+
+  const handleSelect = (entity: Entity) => {
+    onSelect(entity);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    onOpenChange?.(newOpen);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        {/* Não renderiza um botão, apenas ativa o popover */}
+        <div />
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0" align="start">
+        <Command>
+          <CommandInput
+            placeholder={placeholder}
+            value={query}
+            onValueChange={setQuery}
+            autoFocus
+          />
+          <CommandList>
+            {lastSearchResults.length === 0 && query.trim() && (
+              <CommandEmpty>Nenhuma entidade encontrada</CommandEmpty>
+            )}
+
+            {lastSearchResults.length > 0 && (
+              <CommandGroup>
+                {lastSearchResults.map((entity) => (
+                  <CommandItem
+                    key={entity.id}
+                    value={entity.id}
+                    onSelect={() => handleSelect(entity)}
+                  >
+                    <EntityBadge entity={entity} />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}

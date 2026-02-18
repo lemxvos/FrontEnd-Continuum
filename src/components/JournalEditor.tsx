@@ -1,1 +1,277 @@
-/**\n * JOURNAL EDITOR\n * \n * Editor de notas com suporte a menções\n * \n * FLUXO:\n * 1. Usuário digita conteúdo em textarea\n * 2. Detecta padrão {type ou @name\n * 3. Mostra autocomplete\n * 4. Seleciona entidade\n * 5. INSERE {type:id} no texto\n * 6. Ao salvar: envia content com menções ao backend\n * 7. Backend parseia, valida, retorna com entities[]\n * 8. Store sincroniza\n */\n\nimport { useState, useRef, useEffect } from \"react\";\nimport { Button } from \"@/components/ui/button\";\nimport { Textarea } from \"@/components/ui/textarea\";\nimport { Input } from \"@/components/ui/input\";\nimport { Tabs, TabsContent, TabsList, TabsTrigger } from \"@/components/ui/tabs\";\nimport {\n  useMentionAutocompleteState,\n  useMentionTokens,\n  insertMentionAtPosition,\n} from \"@/hooks/useMentions\";\nimport { MentionDisplay } from \"./MentionDisplay\";\nimport { EntitySelector } from \"./EntitySelector\";\nimport { useNoteStore } from \"@/stores/noteStore\";\nimport { useEntityStore } from \"@/stores/entityStore\";\nimport { Entity, CreateNotePayload, UpdateNotePayload, Note } from \"@/types/models\";\nimport { Loader2 } from \"lucide-react\";\n\ninterface JournalEditorProps {\n  /**\n   * Se é novo ou edição\n   * Se undefined = novo\n   * Se string = editando esse ID\n   */\n  noteId?: string;\n\n  // Callback ao salvar com sucesso\n  onSaveSuccess?: (note: Note) => void;\n\n  // Callback ao cancelar\n  onCancel?: () => void;\n\n  // Pasta padrão para new notes\n  defaultFolder?: string;\n}\n\nexport function JournalEditor({\n  noteId,\n  onSaveSuccess,\n  onCancel,\n  defaultFolder = \"inbox\",\n}: JournalEditorProps) {\n  // State local do editor\n  const [title, setTitle] = useState(\"\");\n  const [content, setContent] = useState(\"\");\n  const [folderPath, setFolderPath] = useState(defaultFolder);\n  const [cursorPos, setCursorPos] = useState(0);\n  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);\n  const [isSaving, setIsSaving] = useState(false);\n\n  const textareaRef = useRef<HTMLTextAreaElement>(null);\n\n  // Stores\n  const { create: createNote, update: updateNote, isLoading: notesLoading, currentNote } = useNoteStore();\n  const { lastSearchResults: suggestedEntities } = useEntityStore();\n\n  // Carrega nota se é edit mode\n  useEffect(() => {\n    if (noteId) {\n      const note = currentNote;\n      if (note) {\n        setTitle(note.title);\n        setContent(note.content);\n        setFolderPath(note.folderPath);\n      }\n    }\n  }, [noteId, currentNote]);\n\n  // Detecta se está digitando menção\n  const mentionState = useMentionAutocompleteState(content, cursorPos);\n\n  // Hook: Tokeniza menções para preview\n  const tokens = useMentionTokens(content);\n\n  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {\n    setContent(e.target.value);\n    setCursorPos(e.target.selectionStart);\n  };\n\n  const handleSelectionChange = () => {\n    if (textareaRef.current) {\n      setCursorPos(textareaRef.current.selectionStart);\n    }\n  };\n\n  /**\n   * Quando usuário seleciona uma entidade do autocomplete\n   * \n   * IMPORTANTE:\n   * - Insere {type:id} no texto\n   * - NÃO valida nada\n   * - Backend faz a validação ao receber\n   */\n  const handleEntitySelect = (entity: Entity) => {\n    if (mentionState && textareaRef.current) {\n      // Remove a query parcial e insere a menção completa\n      const beforeMention = content.slice(0, mentionState.position + 1);\n      const afterMention = content.slice(cursorPos);\n\n      const fullMention = `${entity.type}:${entity.id}`;\n      const newContent = `${beforeMention}${fullMention}${afterMention}`;\n\n      setContent(newContent);\n      setIsAutocompleteOpen(false);\n\n      // Restaura foco no textarea\n      setTimeout(() => {\n        if (textareaRef.current) {\n          const newPos = beforeMention.length + fullMention.length + 1; // +1 pra fechar chave\n          textareaRef.current.focus();\n          textareaRef.current.setSelectionRange(newPos, newPos);\n          setCursorPos(newPos);\n        }\n      }, 0);\n    }\n  };\n\n  /**\n   * Salva a nota\n   */\n  const handleSave = async () => {\n    if (!title.trim() || !content.trim()) {\n      alert(\"Título e conteúdo são obrigatórios\");\n      return;\n    }\n\n    setIsSaving(true);\n    try {\n      let savedNote: Note;\n\n      if (noteId) {\n        // Edição\n        const payload: UpdateNotePayload = {\n          title,\n          content,\n          folderPath,\n        };\n        savedNote = await updateNote(noteId, payload);\n      } else {\n        // Criação\n        const payload: CreateNotePayload = {\n          title,\n          content,\n          folderPath,\n        };\n        savedNote = await createNote(payload);\n      }\n\n      onSaveSuccess?.(savedNote);\n    } catch (error: any) {\n      alert(`Erro ao salvar: ${error.message}`);\n    } finally {\n      setIsSaving(false);\n    }\n  };\n\n  // Se está carregando\n  if (noteId && notesLoading) {\n    return (\n      <div className=\"flex items-center justify-center h-screen\">\n        <Loader2 className=\"animate-spin\" />\n      </div>\n    );\n  }\n\n  return (\n    <div className=\"flex flex-col h-screen gap-4 p-4\">\n      {/* Header */}\n      <div className=\"flex items-center justify-between\">\n        <div className=\"flex-1\">\n          <Input\n            placeholder=\"Título da nota\"\n            value={title}\n            onChange={(e) => setTitle(e.target.value)}\n            className=\"text-xl font-bold mb-2\"\n          />\n          <Input\n            placeholder=\"Caminho da pasta (ex: vida/amigos)\"\n            value={folderPath}\n            onChange={(e) => setFolderPath(e.target.value)}\n            className=\"text-sm text-gray-600\"\n          />\n        </div>\n        <div className=\"flex gap-2\">\n          <Button variant=\"outline\" onClick={onCancel}>\n            Cancelar\n          </Button>\n          <Button onClick={handleSave} disabled={isSaving}>\n            {isSaving ? (\n              <>\n                <Loader2 className=\"mr-2 h-4 w-4 animate-spin\" />\n                Salvando...\n              </>\n            ) : (\n              \"Salvar\"\n            )}\n          </Button>\n        </div>\n      </div>\n\n      {/* Tabs: Editor / Preview */}\n      <Tabs defaultValue=\"editor\" className=\"flex-1 flex flex-col\">\n        <TabsList>\n          <TabsTrigger value=\"editor\">Editor</TabsTrigger>\n          <TabsTrigger value=\"preview\">Preview</TabsTrigger>\n        </TabsList>\n\n        <TabsContent value=\"editor\" className=\"flex-1 relative\">\n          <Textarea\n            ref={textareaRef}\n            placeholder=\"Escreva sua nota aqui. Use {type:id} para mencionar entidades.\nExemplo: Saí com {person:ent_8f2a}\"\n            value={content}\n            onChange={handleTextChange}\n            onSelect={handleSelectionChange}\n            onClick={handleSelectionChange}\n            onKeyUp={handleSelectionChange}\n            className=\"h-full font-mono text-sm\"\n          />\n\n          {/* Autocomplete popup */}\n          {mentionState && (\n            <div className=\"absolute bottom-0 left-0 z-50\">\n              <EntitySelector\n                isOpen={true}\n                onOpenChange={setIsAutocompleteOpen}\n                initialQuery={mentionState.query}\n                onSelect={handleEntitySelect}\n              />\n            </div>\n          )}\n        </TabsContent>\n\n        <TabsContent value=\"preview\" className=\"flex-1 overflow-auto\">\n          <div className=\"prose prose-sm max-w-none p-4\">\n            <h1>{title}</h1>\n            <p className=\"text-gray-500 text-sm\">📁 {folderPath}</p>\n            <hr />\n            {/* \n              IMPORTANTE:\n              - Se a nota foi salva, `currentNote.entities` vem do backend\n              - Se não foi salva, entities pode estar vazio\n              - Mostra o raw text com menções de forma legível\n            */}\n            <MentionDisplay\n              content={content}\n              entities={currentNote?.entities || []}\n            />\n          </div>\n        </TabsContent>\n      </Tabs>\n\n      {/* Status info */}\n      {mentionState && (\n        <div className=\"text-sm text-gray-500 px-4\">\n          💡 Digitando menção: {mentionState.trigger}{mentionState.query}\n        </div>\n      )}\n    </div>\n  );\n}\n
+/**
+ * JOURNAL EDITOR
+ *
+ * Editor de notas com suporte a menções
+ *
+ * FLUXO:
+ * 1. Usuário digita conteúdo em textarea
+ * 2. Detecta padrão {type ou @name
+ * 3. Mostra autocomplete
+ * 4. Seleciona entidade
+ * 5. INSERE {type:id} no texto
+ * 6. Ao salvar: envia content com menções ao backend
+ * 7. Backend parseia, valida, retorna com entities[]
+ * 8. Store sincroniza
+ */
+
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  useMentionAutocompleteState,
+  useMentionTokens,
+  insertMentionAtPosition,
+} from "@/hooks/useMentions";
+import { MentionDisplay } from "./MentionDisplay";
+import { EntitySelector } from "./EntitySelector";
+import { useNoteStore } from "@/stores/noteStore";
+import { useEntityStore } from "@/stores/entityStore";
+import { Entity, CreateNotePayload, UpdateNotePayload, Note } from "@/types/models";
+import { Loader2 } from "lucide-react";
+
+interface JournalEditorProps {
+  /**
+   * Se é novo ou edição
+   * Se undefined = novo
+   * Se string = editando esse ID
+   */
+  noteId?: string;
+
+  // Callback ao salvar com sucesso
+  onSaveSuccess?: (note: Note) => void;
+
+  // Callback ao cancelar
+  onCancel?: () => void;
+
+  // Pasta padrão para new notes
+  defaultFolder?: string;
+}
+
+export function JournalEditor({
+  noteId,
+  onSaveSuccess,
+  onCancel,
+  defaultFolder = "inbox",
+}: JournalEditorProps) {
+  // State local do editor
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [folderPath, setFolderPath] = useState(defaultFolder);
+  const [cursorPos, setCursorPos] = useState(0);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Stores
+  const { create: createNote, update: updateNote, isLoading: notesLoading, currentNote } = useNoteStore();
+  const { lastSearchResults: suggestedEntities } = useEntityStore();
+
+  // Carrega nota se é edit mode
+  useEffect(() => {
+    if (noteId) {
+      const note = currentNote;
+      if (note) {
+        setTitle(note.title);
+        setContent(note.content);
+        setFolderPath(note.folderPath);
+      }
+    }
+  }, [noteId, currentNote]);
+
+  // Detecta se está digitando menção
+  const mentionState = useMentionAutocompleteState(content, cursorPos);
+
+  // Hook: Tokeniza menções para preview
+  const tokens = useMentionTokens(content);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setContent(e.target.value);
+    setCursorPos(e.target.selectionStart);
+  };
+
+  const handleSelectionChange = () => {
+    if (textareaRef.current) {
+      setCursorPos(textareaRef.current.selectionStart);
+    }
+  };
+
+  /**
+   * Quando usuário seleciona uma entidade do autocomplete
+   *
+   * IMPORTANTE:
+   * - Insere {type:id} no texto
+   * - NÃO valida nada
+   * - Backend faz a validação ao receber
+   */
+  const handleEntitySelect = (entity: Entity) => {
+    if (mentionState && textareaRef.current) {
+      // Remove a query parcial e insere a menção completa
+      const beforeMention = content.slice(0, mentionState.position + 1);
+      const afterMention = content.slice(cursorPos);
+
+      const fullMention = `${entity.type}:${entity.id}`;
+      const newContent = `${beforeMention}${fullMention}${afterMention}`;
+
+      setContent(newContent);
+      setIsAutocompleteOpen(false);
+
+      // Restaura foco no textarea
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const newPos = beforeMention.length + fullMention.length + 1; // +1 pra fechar chave
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newPos, newPos);
+          setCursorPos(newPos);
+        }
+      }, 0);
+    }
+  };
+
+  /**
+   * Salva a nota
+   */
+  const handleSave = async () => {
+    if (!title.trim() || !content.trim()) {
+      alert("Título e conteúdo são obrigatórios");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      let savedNote: Note;
+
+      if (noteId) {
+        // Edição
+        const payload: UpdateNotePayload = {
+          title,
+          content,
+          folderPath,
+        };
+        savedNote = await updateNote(noteId, payload);
+      } else {
+        // Criação
+        const payload: CreateNotePayload = {
+          title,
+          content,
+          folderPath,
+        };
+        savedNote = await createNote(payload);
+      }
+
+      onSaveSuccess?.(savedNote);
+    } catch (error: any) {
+      alert(`Erro ao salvar: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Se está carregando
+  if (noteId && notesLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen gap-4 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <Input
+            placeholder="Título da nota"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-xl font-bold mb-2"
+          />
+          <Input
+            placeholder="Caminho da pasta (ex: vida/amigos)"
+            value={folderPath}
+            onChange={(e) => setFolderPath(e.target.value)}
+            className="text-sm text-gray-600"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              "Salvar"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs: Editor / Preview */}
+      <Tabs defaultValue="editor" className="flex-1 flex flex-col">
+        <TabsList>
+          <TabsTrigger value="editor">Editor</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="editor" className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            placeholder={
+              "Escreva sua nota aqui. Use {type:id} para mencionar entidades.\nExemplo: Saí com {person:ent_8f2a}"
+            }
+            value={content}
+            onChange={handleTextChange}
+            onSelect={handleSelectionChange}
+            onClick={handleSelectionChange}
+            onKeyUp={handleSelectionChange}
+            className="h-full font-mono text-sm"
+          />
+
+          {/* Autocomplete popup */}
+          {mentionState && (
+            <div className="absolute bottom-0 left-0 z-50">
+              <EntitySelector
+                isOpen={true}
+                onOpenChange={setIsAutocompleteOpen}
+                initialQuery={mentionState.query}
+                onSelect={handleEntitySelect}
+              />
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="preview" className="flex-1 overflow-auto">
+          <div className="prose prose-sm max-w-none p-4">
+            <h1>{title}</h1>
+            <p className="text-gray-500 text-sm">📁 {folderPath}</p>
+            <hr />
+            {/*
+              IMPORTANTE:
+              - Se a nota foi salva, `currentNote.entities` vem do backend
+              - Se não foi salva, entities pode estar vazio
+              - Mostra o raw text com menções de forma legível
+            */}
+            <MentionDisplay
+              content={content}
+              entities={currentNote?.entities || []}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Status info */}
+      {mentionState && (
+        <div className="text-sm text-gray-500 px-4">
+          💡 Digitando menção: {mentionState.trigger}{mentionState.query}
+        </div>
+      )}
+    </div>
+  );
+}
