@@ -174,4 +174,4 @@ export function InsightsPanel() {
       </Tabs>
     </div>
   );
-}\n
+}
