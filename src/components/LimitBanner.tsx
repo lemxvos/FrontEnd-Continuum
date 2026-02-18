@@ -14,7 +14,8 @@ export default function LimitBanner({ current, max, label }: LimitBannerProps) {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
 
-  if (user?.plan === "PRO") return null;
+  // Não mostrar para usuários de planos pagos
+  if (user?.plan && user.plan !== "FREE") return null;
 
   const ratio = current / max;
   const isNear = ratio >= 0.8;

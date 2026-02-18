@@ -26,10 +26,10 @@ interface Entity {
   mentions?: number;
 }
 
-const typeMap: Record<string, { type: string; label: string; singular: string; icon: typeof Users; endpoint: string; limit: number }> = {
-  people: { type: "PERSON", label: "Pessoas", singular: "pessoa", icon: Users, endpoint: "/api/entities/people", limit: 10 },
-  habits: { type: "HABIT", label: "Hábitos", singular: "hábito", icon: Target, endpoint: "/api/entities/habits", limit: 5 },
-  projects: { type: "PROJECT", label: "Projetos", singular: "projeto", icon: FolderKanban, endpoint: "/api/entities/projects", limit: 5 },
+const typeMap: Record<string, { type: string; label: string; singular: string; icon: typeof Users; limit: number }> = {
+  people: { type: "PERSON", label: "Pessoas", singular: "pessoa", icon: Users, limit: 10 },
+  habits: { type: "HABIT", label: "Hábitos", singular: "hábito", icon: Target, limit: 5 },
+  projects: { type: "PROJECT", label: "Projetos", singular: "projeto", icon: FolderKanban, limit: 5 },
 };
 
 export default function EntityListPage() {
@@ -47,9 +47,9 @@ export default function EntityListPage() {
 
   useEffect(() => {
     setLoading(true);
-    api.get(config.endpoint)
+    api.get(`/api/entities?type=${config.type}`)
       .then(({ data }) => {
-        setEntities(Array.isArray(data) ? data : data.entities || []);
+        setEntities(Array.isArray(data) ? data : []);
       })
       .catch((err) => toast.error(err.response?.data?.message || "Erro"))
       .finally(() => setLoading(false));

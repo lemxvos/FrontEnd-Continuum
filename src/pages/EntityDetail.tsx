@@ -34,7 +34,8 @@ interface EntityStats {
 }
 
 interface Mention {
-  entryId: string;
+  noteId: string;
+  noteTitle: string;
   date: string;
   context: string;
 }
@@ -71,13 +72,17 @@ export default function EntityDetailPage() {
       api.get(`/api/entities/${id}`).then(({ data }) => setEntity(data)),
     ];
 
-    // Try to load stats and heatmap (may fail if not trackable)
+    // Load stats and heatmap (may fail if not trackable)
     promises.push(
       api.get(`/api/entities/${id}/stats`).then(({ data }) => setStats(data)).catch(() => {}),
       api.get(`/api/entities/${id}/heatmap`).then(({ data }) => {
-        // Handle both map and array formats
         if (typeof data === "object" && !Array.isArray(data)) {
           setHeatmap(data);
+        }
+      }).catch(() => {}),
+      api.get(`/api/metrics/entities/${id}/timeline`).then(({ data }) => {
+        if (data?.mentions && Array.isArray(data.mentions)) {
+          setMentions(data.mentions);
         }
       }).catch(() => {}),
     );
@@ -90,20 +95,6 @@ export default function EntityDetailPage() {
   useEffect(() => {
     if (!id) return;
     loadData();
-
-    // Load timeline (try connections endpoints)
-    const tryEndpoints = async () => {
-      for (const type of ["person", "habit", "project"]) {
-        try {
-          const { data } = await api.get(`/api/connections/${type}/${id}`);
-          if (data?.mentions) {
-            setMentions(data.mentions);
-            return;
-          }
-        } catch {}
-      }
-    };
-    tryEndpoints();
   }, [id]);
 
   const handleDelete = async () => {
@@ -119,7 +110,10 @@ export default function EntityDetailPage() {
   const handleCheckmark = async () => {
     try {
       const today = format(new Date(), "yyyy-MM-dd");
-      await api.post(`/api/entities/${id}/checkmark?date=${today}`);
+      await api.post(`/api/entities/${id}/track`, {
+        date: today,
+        value: 1,
+      });
       toast.success("Registrado! ✓");
       loadData();
     } catch (err: any) {
@@ -225,12 +219,12 @@ export default function EntityDetailPage() {
         ) : (
           mentions.map((m, i) => (
             <motion.div
-              key={`${m.entryId}-${i}`}
+              key={`${m.noteId}-${i}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.02 }}
               className="surface rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--surface-2))] transition-colors"
-              onClick={() => navigate(`/journal/${m.entryId}`)}
+              onClick={() => navigate(`/journal/${m.noteId}`)}
             >
               <p className="text-xs text-muted-foreground mb-1">
                 {format(new Date(m.date), "dd/MM/yyyy HH:mm", { locale: ptBR })}

@@ -17,10 +17,12 @@ import {
 
 interface JournalEntry {
   id: string;
-  content: string;
+  title?: string;
+  content?: string;
   createdAt: string;
   updatedAt?: string;
-  deleted?: boolean;
+  folderId?: string;
+  archivedAt?: string;
 }
 
 export default function JournalPage() {
@@ -32,9 +34,9 @@ export default function JournalPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get("/api/journal")
+    api.get("/api/notes")
       .then(({ data }) => {
-        const list = Array.isArray(data) ? data : data.entries || [];
+        const list = Array.isArray(data) ? data : [];
         setEntries(list);
       })
       .catch((err) => {
@@ -47,7 +49,7 @@ export default function JournalPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await api.delete(`/api/journal/${deleteTarget.id}`);
+      await api.delete(`/api/notes/${deleteTarget.id}`);
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       toast.success("Entrada excluída!");
     } catch (err: any) {

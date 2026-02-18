@@ -22,10 +22,10 @@ export default function LoginPage() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       login(data.token, {
-        id: data.user?.id || data.userId,
-        email: data.user?.email || data.email,
-        username: data.user?.username || data.username,
-        plan: data.user?.plan || data.planType || "FREE",
+        id: data.userId,
+        email: data.email,
+        username: data.username,
+        plan: data.plan || "FREE",
       });
       toast.success("Login realizado!");
       navigate("/journal");

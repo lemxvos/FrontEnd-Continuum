@@ -35,9 +35,14 @@ export default function SearchPage() {
     setSearched(true);
     try {
       const params = new URLSearchParams({ q: query });
-      if (type) params.set("type", type);
-      const { data } = await api.get(`/api/connections/search?${params}`);
-      setResults(data.results || data || []);
+      if (type) params.set("type", type.toUpperCase());
+      const { data } = await api.get(`/api/entities/search?${params}`);
+      setResults(Array.isArray(data) ? data.map((e: any) => ({
+        type: e.type.toLowerCase(),
+        id: e.id,
+        name: e.name,
+        mentions: 0, // API não retorna mentions no search
+      })) : []);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Erro");
     } finally {

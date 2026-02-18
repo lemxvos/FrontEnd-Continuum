@@ -38,7 +38,7 @@ export default function JournalEditorPage() {
 
   useEffect(() => {
     if (!isNew && id) {
-      api.get(`/api/journal/${id}`)
+      api.get(`/api/notes/${id}`)
         .then(({ data }) => setContent(data.content))
         .catch((err) => {
           toast.error(err.response?.data?.message || "Erro");
@@ -67,12 +67,12 @@ export default function JournalEditorPage() {
     setSaving(true);
     try {
       if (isNew) {
-        const { data: entry } = await api.post("/api/journal", { content });
+        const { data: entry } = await api.post("/api/notes", { content });
         localStorage.removeItem("continuum_draft");
         if (!silent) toast.success("Entrada criada!");
         navigate(`/journal/${entry.id}`, { replace: true });
       } else {
-        await api.put(`/api/journal/${id}`, { content });
+        await api.put(`/api/notes/${id}`, { content });
         if (!silent) toast.success("Entrada salva!");
       }
     } catch (err: any) {

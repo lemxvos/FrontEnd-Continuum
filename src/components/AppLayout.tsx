@@ -129,7 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             Settings
           </NavLink>
 
-          {user?.plan !== "PRO" && (
+          {user?.plan !== "VISION" && (
             <NavLink
               to="/upgrade"
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-colors"

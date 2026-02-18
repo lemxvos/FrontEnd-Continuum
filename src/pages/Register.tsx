@@ -23,10 +23,10 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post("/auth/register", { username, email, password });
       login(data.token, {
-        id: data.user?.id || data.userId,
-        email: data.user?.email || data.email,
-        username: data.user?.username || data.username,
-        plan: data.user?.plan || data.planType || "FREE",
+        id: data.userId,
+        email: data.email,
+        username: data.username,
+        plan: data.plan || "FREE",
       });
       toast.success("Conta criada!");
       navigate("/journal");

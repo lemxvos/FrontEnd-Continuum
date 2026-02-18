@@ -1,11 +1,20 @@
 import { create } from "zustand";
 
+export type UserPlan = "FREE" | "PLUS" | "PRO" | "VISION";
+
 export interface User {
   id: string;
   email: string;
   username?: string;
-  plan?: "FREE" | "PRO";
+  plan?: UserPlan;
+  subscriptionStatus?: "ACTIVE" | "PAST_DUE" | "CANCELED" | "INCOMPLETE" | "TRIALING" | "UNPAID";
   active?: boolean;
+  maxEntities?: number;
+  maxNotes?: number;
+  maxHabits?: number;
+  advancedMetrics?: boolean;
+  dataExport?: boolean;
+  calendarSync?: boolean;
 }
 
 interface AuthState {

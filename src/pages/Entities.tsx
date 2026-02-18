@@ -41,8 +41,15 @@ export default function EntitiesOverview() {
 
   useEffect(() => {
     Promise.all([
-      api.get("/api/entities").then(({ data }) => Array.isArray(data) ? data : data.entities || []),
-      api.get("/api/entities/stats").then(({ data }) => data).catch(() => ({})),
+      api.get("/api/entities").then(({ data }) => Array.isArray(data) ? data : []),
+      api.get("/api/metrics/dashboard").then(({ data }) => {
+        // Mapear DashboardMetrics para EntityStats
+        const stats: EntityStats = {};
+        stats.PERSON = data.uniquePeople || 0;
+        stats.HABIT = data.uniqueHabits || 0;
+        stats.PROJECT = data.uniqueProjects || 0;
+        return stats;
+      }).catch(() => ({})),
     ])
       .then(([entities, stats]) => {
         setEntities(entities);

@@ -70,7 +70,7 @@ export default function ConnectionsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/api/connections/dashboard")
+    api.get("/api/metrics/dashboard")
       .then(({ data }) => setData(data))
       .catch((err) => toast.error(err.response?.data?.message || "Erro"))
       .finally(() => setLoading(false));
