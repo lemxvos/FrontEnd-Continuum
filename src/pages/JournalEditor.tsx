@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
@@ -22,7 +23,7 @@ function renderMarkdown(text: string | undefined | null): string {
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-1">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\{\{entity:([^}]+)\}\}/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">📌 [$1]</span>')
+    .replace(/\{\{entity:([^}]+)\}\}/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20">📌</span>')
     .replace(/\n/g, "<br/>");
 }
 
@@ -31,6 +32,9 @@ export default function JournalEditorPage() {
   const navigate = useNavigate();
   const isNew = !id || id === "new";
 
+  const [title, setTitle] = useState(() =>
+    isNew ? localStorage.getItem("continuum_draft_title") || "" : ""
+  );
   const [content, setContent] = useState(() =>
     isNew ? localStorage.getItem("continuum_draft") || "" : ""
   );
@@ -45,7 +49,8 @@ export default function JournalEditorPage() {
     if (!isNew && id) {
       api.get(`/api/notes/${id}`)
         .then(({ data }) => {
-          // Load content as-is from backend (no transformation)
+          // Load content and title as-is from backend
+          setTitle(data.title || "");
           setContent(data.content);
         })
         .catch((err) => {
@@ -77,6 +82,7 @@ export default function JournalEditorPage() {
   useEffect(() => {
     if (isNew) {
       localStorage.setItem("continuum_draft", content);
+      localStorage.setItem("continuum_draft_title", title);
     }
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
     if (!isNew && content.trim()) {
@@ -85,21 +91,22 @@ export default function JournalEditorPage() {
     return () => {
       if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
     };
-  }, [content]);
+  }, [content, title]);
 
   const handleSave = async (silent = false) => {
     if (!content.trim()) return;
     setSaving(true);
     try {
-      // Send content as-is to backend
+      // Send title and content as-is to backend
       // Backend is responsible for extracting {{entity:id}} mentions
       if (isNew) {
-        const { data: entry } = await api.post("/api/notes", { content });
+        const { data: entry } = await api.post("/api/notes", { title, content });
         localStorage.removeItem("continuum_draft");
+        localStorage.removeItem("continuum_draft_title");
         if (!silent) toast.success("Entrada criada!");
         navigate(`/journal/${entry.id}`, { replace: true });
       } else {
-        await api.put(`/api/notes/${id}`, { content });
+        await api.put(`/api/notes/${id}`, { title, content });
         if (!silent) toast.success("Entrada salva!");
       }
     } catch (err: any) {
@@ -129,12 +136,9 @@ export default function JournalEditorPage() {
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/journal")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h2 className="text-xl font-bold">{isNew ? "Nova Entrada" : "Editar Entrada"}</h2>
-        </div>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/journal")}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -150,6 +154,14 @@ export default function JournalEditorPage() {
           </Button>
         </div>
       </div>
+
+      {/* Title input */}
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Título (opcional)"
+        className="text-lg font-semibold"
+      />
 
       {preview ? (
         <div className="surface rounded-xl p-6 min-h-[400px]">

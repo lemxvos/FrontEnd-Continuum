@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 
 interface JournalEntry {
   id: string;
+  title?: string;
   content: string;
   createdAt: string;
 }
@@ -18,7 +19,8 @@ interface JournalCardProps {
 
 export default function JournalCard({ entry, onClick, onDelete, index = 0 }: JournalCardProps) {
   const content = entry.content || "";
-  const preview = content.replace(/[#@*]/g, "").slice(0, 200);
+  // Remove mention format {{entity:xxx}} for preview
+  const cleanContent = content.replace(/\{\{entity:[^}]+\}\}/g, "").slice(0, 200);
   const date = new Date(entry.createdAt);
 
   return (
@@ -42,7 +44,8 @@ export default function JournalCard({ entry, onClick, onDelete, index = 0 }: Jou
           </button>
         )}
       </div>
-      <p className="text-sm text-foreground/80 line-clamp-3 mb-3 leading-relaxed">{preview}</p>
+      {entry.title && <p className="text-sm font-semibold mb-1">{entry.title}</p>}
+      <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">{cleanContent}</p>
     </motion.div>
   );
 }
