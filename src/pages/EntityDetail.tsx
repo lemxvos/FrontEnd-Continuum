@@ -11,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 import HeatmapGrid from "@/components/HeatmapGrid";
 import StreakCounter from "@/components/StreakCounter";
 import ProgressModal from "@/components/ProgressModal";
+import { RelatedEntities } from "@/components/RelatedEntities";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -67,6 +68,11 @@ export default function EntityDetailPage() {
   const [progressOpen, setProgressOpen] = useState(false);
 
   const loadData = () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
     const promises: Promise<any>[] = [
       api.get(`/api/entities/${id}`).then(({ data }) => setEntity(data)),
     ];
@@ -84,10 +90,13 @@ export default function EntityDetailPage() {
           setMentions(data.mentions);
         }
       }).catch(() => {}),
-    );
+    ];
 
-    Promise.all(promises)
-      .catch((err) => toast.error(err.response?.data?.message || "Erro"))
+    Promise.allSettled(promises)
+      .catch((err) => {
+        console.error("Error loading entity data:", err);
+        toast.error(err.response?.data?.message || "Erro ao carregar");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -207,6 +216,12 @@ export default function EntityDetailPage() {
           <HeatmapGrid data={heatmap} />
         </motion.div>
       )}
+
+      {/* Related Entities */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="surface rounded-xl p-4">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Relacionada com</p>
+        <RelatedEntities entityId={entity.id} />
+      </motion.div>
 
       {/* Timeline */}
       <div className="space-y-2">

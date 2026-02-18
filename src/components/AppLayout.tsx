@@ -2,11 +2,10 @@ import { NavLink } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
+  BarChart3,
   BookOpen,
   Globe,
   Users,
-  Target,
-  FolderKanban,
   Settings,
   LogOut,
   Sparkles,
@@ -20,18 +19,17 @@ import PlanBadge from "@/components/PlanBadge";
 import { useNavigate } from "react-router-dom";
 
 const sidebarNav = [
+  { to: "/dashboard", icon: BarChart3, label: "Dashboard" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
-  { to: "/connections", icon: Globe, label: "Conexões" },
-  { divider: true },
-  { to: "/entities/people", icon: Users, label: "Pessoas" },
-  { to: "/entities/habits", icon: Target, label: "Hábitos" },
-  { to: "/entities/projects", icon: FolderKanban, label: "Projetos" },
+  { to: "/entities", icon: Globe, label: "Entidades" },
+  { to: "/connections", icon: Users, label: "Conexões" },
 ];
 
 const mobileNav = [
+  { to: "/dashboard", icon: BarChart3, label: "Dashboard" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
   { to: "/connections", icon: Globe, label: "Conexões" },
-  { to: "/entities", icon: Target, label: "Entidades" },
+  { to: "/entities", icon: Users, label: "Entidades" },
   { to: "/settings", icon: Settings, label: "Config" },
 ];
 

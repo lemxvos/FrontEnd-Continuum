@@ -9,10 +9,10 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
+import DashboardPage from "@/pages/Dashboard";
 import JournalPage from "@/pages/Journal";
 import JournalEditorPage from "@/pages/JournalEditor";
-import EntitiesOverview from "@/pages/Entities";
-import EntityListPage from "@/pages/EntityList";
+import AllEntitiesPage from "@/pages/AllEntities";
 import EntityCreatePage from "@/pages/EntityCreate";
 import EntityDetailPage from "@/pages/EntityDetail";
 import ConnectionsPage from "@/pages/Connections";
@@ -40,17 +40,15 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <Routes>
-                <Route path="/" element={<Navigate to="/journal" replace />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/journal" element={<JournalPage />} />
                 <Route path="/journal/new" element={<JournalEditorPage />} />
                 <Route path="/journal/:id" element={<JournalEditorPage />} />
-                <Route path="/connections" element={<ConnectionsPage />} />
-                <Route path="/entities" element={<EntitiesOverview />} />
-                <Route path="/entities/people" element={<EntityListPage />} />
-                <Route path="/entities/habits" element={<EntityListPage />} />
-                <Route path="/entities/projects" element={<EntityListPage />} />
+                <Route path="/entities" element={<AllEntitiesPage />} />
                 <Route path="/entities/new" element={<EntityCreatePage />} />
                 <Route path="/entities/:id" element={<EntityDetailPage />} />
+                <Route path="/connections" element={<ConnectionsPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/upgrade" element={<UpgradePage />} />
