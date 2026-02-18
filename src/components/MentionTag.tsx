@@ -34,11 +34,17 @@ export default function MentionTag({ type, name, className, onClick }: MentionTa
   );
 }
 
+interface Entity {
+  id: string;
+  name: string;
+  type: "PERSON" | "HABIT" | "PROJECT" | "GOAL" | "DREAM" | "CUSTOM";
+}
+
 export function extractMentions(content: string) {
   const mentions: { type: EntityType; name: string }[] = [];
   const personRegex = /@([\w\u00C0-\u024F]+)/g;
   const projectRegex = /#([\w\u00C0-\u024F]+)/g;
-  const habitRegex = /\*([\w\u00C0-\u024F]+)/g;
+  const habitRegex = /(?<!\*)\*(?!\*)(?!\s)([\w\u00C0-\u024F]+)/g;
 
   let match;
   while ((match = personRegex.exec(content)) !== null) {
@@ -49,6 +55,42 @@ export function extractMentions(content: string) {
   }
   while ((match = habitRegex.exec(content)) !== null) {
     mentions.push({ type: "habit", name: match[1] });
+  }
+  return mentions;
+}
+
+/**
+ * Extract ONLY valid mentions that have been created as entities
+ * This prevents arbitrary text like "@anything" from being treated as mentions
+ */
+export function extractValidMentions(content: string, entities: Entity[]) {
+  const mentions: { type: EntityType; name: string }[] = [];
+  
+  // Create maps for quick lookup
+  const personMap = new Map(entities.filter(e => e.type === "PERSON").map(e => [e.name.toLowerCase(), "person"]));
+  const projectMap = new Map(entities.filter(e => e.type === "PROJECT").map(e => [e.name.toLowerCase(), "project"]));
+  const habitMap = new Map(entities.filter(e => e.type === "HABIT").map(e => [e.name.toLowerCase(), "habit"]));
+
+  // Extract and validate
+  const personRegex = /@([\w\u00C0-\u024F]+)/g;
+  const projectRegex = /#([\w\u00C0-\u024F]+)/g;
+  const habitRegex = /(?<!\*)\*(?!\*)(?!\s)([\w\u00C0-\u024F]+)/g;
+
+  let match;
+  while ((match = personRegex.exec(content)) !== null) {
+    if (personMap.has(match[1].toLowerCase())) {
+      mentions.push({ type: "person", name: match[1] });
+    }
+  }
+  while ((match = projectRegex.exec(content)) !== null) {
+    if (projectMap.has(match[1].toLowerCase())) {
+      mentions.push({ type: "project", name: match[1] });
+    }
+  }
+  while ((match = habitRegex.exec(content)) !== null) {
+    if (habitMap.has(match[1].toLowerCase())) {
+      mentions.push({ type: "habit", name: match[1] });
+    }
   }
   return mentions;
 }

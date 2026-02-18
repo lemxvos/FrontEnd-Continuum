@@ -1,6 +1,5 @@
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import MentionTag, { extractMentions } from "@/components/MentionTag";
 import { Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -19,7 +18,6 @@ interface JournalCardProps {
 
 export default function JournalCard({ entry, onClick, onDelete, index = 0 }: JournalCardProps) {
   const content = entry.content || "";
-  const mentions = extractMentions(content);
   const preview = content.replace(/[#@*]/g, "").slice(0, 200);
   const date = new Date(entry.createdAt);
 
@@ -45,16 +43,6 @@ export default function JournalCard({ entry, onClick, onDelete, index = 0 }: Jou
         )}
       </div>
       <p className="text-sm text-foreground/80 line-clamp-3 mb-3 leading-relaxed">{preview}</p>
-      {mentions.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {mentions.slice(0, 5).map((m, i) => (
-            <MentionTag key={`${m.type}-${m.name}-${i}`} type={m.type} name={m.name} />
-          ))}
-          {mentions.length > 5 && (
-            <span className="text-xs text-muted-foreground px-1">+{mentions.length - 5}</span>
-          )}
-        </div>
-      )}
     </motion.div>
   );
 }

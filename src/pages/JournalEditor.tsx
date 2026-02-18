@@ -2,12 +2,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Edit3, Loader2 } from "lucide-react";
-import MentionTag, { extractMentions } from "@/components/MentionTag";
+import MentionTag, { extractValidMentions } from "@/components/MentionTag";
+import MentionInput from "@/components/MentionInput";
 import UpgradeModal from "@/components/UpgradeModal";
+
+interface Entity {
+  id: string;
+  name: string;
+  type: "PERSON" | "HABIT" | "PROJECT" | "GOAL" | "DREAM" | "CUSTOM";
+}
 
 function renderMarkdown(text: string | undefined | null): string {
   if (!text) return "<p class=\"text-muted-foreground\">Nada para preview...</p>";
@@ -34,7 +40,7 @@ export default function JournalEditorPage() {
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [entities, setEntities] = useState<Entity[]>([]);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -48,6 +54,23 @@ export default function JournalEditorPage() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  // Load entities for mention validation
+  useEffect(() => {
+    const loadEntities = async () => {
+      try {
+        const [people, habits, projects] = await Promise.all([
+          api.get("/api/entities?type=PERSON").then(({ data }) => data || []),
+          api.get("/api/entities?type=HABIT").then(({ data }) => data || []),
+          api.get("/api/entities?type=PROJECT").then(({ data }) => data || []),
+        ]);
+        setEntities([...people, ...habits, ...projects]);
+      } catch (err) {
+        console.error("Erro ao carregar entidades:", err);
+      }
+    };
+    loadEntities();
+  }, []);
 
   // Auto-save every 30s
   useEffect(() => {
@@ -89,7 +112,7 @@ export default function JournalEditorPage() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
-  const mentions = extractMentions(content);
+  const mentions = extractValidMentions(content, entities);
 
   if (loading) {
     return (
@@ -133,12 +156,12 @@ export default function JournalEditorPage() {
           />
         </div>
       ) : (
-        <Textarea
-          ref={textareaRef}
+        <MentionInput
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Escreva sobre seu dia... Use @pessoa, #projeto, *hábito para destacar menções."
-          className="min-h-[400px] font-mono text-sm resize-none"
+          onChange={setContent}
+          placeholder="Escreva sobre seu dia... Digite @, #, ou * para ver sugestões de entidades criadas."
+          minHeight="min-h-[400px]"
+          className="font-mono text-sm"
         />
       )}
 
